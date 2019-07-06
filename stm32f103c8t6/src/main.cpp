@@ -485,7 +485,7 @@ extern "C" void __irq_tim3(void) {
 
 	}
 	if (dsr & TIMER_SR_CC2IF) {
-		uint32_t nValue = TIMER2->regs.gen->CCR2;
+		uint32_t nValue = TIMER3->regs.gen->CCR2;
 		#if (SWAP_SENSORS)
 		if (nValue && !g_bLeftSensorRead) {
 			g_nLeftSensorEchoTime = nValue;
@@ -802,9 +802,9 @@ private:
 	static constexpr byte g_conLeftHandBufferAmount = 16;		// try to keep as a power of 2
 	static constexpr byte g_conRightHandBufferAmount = 16;		// try to keep as a power of 2
 
-	static constexpr int g_conMinimumDistance = 350;
-	static constexpr int g_conMaximumDistance = 3000;
-	static constexpr int g_conSensorTimeOut = 4000;
+	static constexpr int g_conMinimumDistance = 400;
+	static constexpr int g_conMaximumDistance = 3500;
+	static constexpr int g_conSensorTimeOut = 5000;
 	static constexpr int g_conNoteBufferSpace = 720;
 
 	unsigned long m_nLeftSensorProcessed=0;
@@ -1254,9 +1254,9 @@ protected:
 		} else if (m_nShortTimeout < m_nCurrentMillis) {
 			defaultDisplay();
 			if (m_bxyMode) {
-				m_ledLeftDigit = 47;
-				m_ledMiddleDigit = 47;
-				m_ledRightDigit = 47;
+				m_ledLeftDigit = 47;		// --
+				m_ledMiddleDigit = 47;		// --
+				m_ledRightDigit = 47;		// --
 			}
 		}
 	}
@@ -1284,34 +1284,46 @@ protected:
 
 	void pingLeftSensor()
 	{
-		g_bLeftSensorRead = false;
 		#if (SWAP_SENSORS)
-		uint8_t nTrigger = RightTrigger_pin;
+		g_bRightSensorRead = false;
 		#else
-		uint8_t nTrigger = LeftTrigger_pin;
+		g_bLeftSensorRead = false;
 		#endif
+
+		uint8_t nTrigger = LeftTrigger_pin;		// Note: Since this pin is phyiscally tied to this timer, still pulse the one labeled "Left"
 		digitalWrite(nTrigger, LOW);
 		delayMicroseconds(2);
 		digitalWrite(nTrigger, HIGH);
-		delayMicroseconds(10);
+		delayMicroseconds(12);
 		digitalWrite(nTrigger, LOW);
+	
+		#if (SWAP_SENSORS)
+		m_timeoutRightSensor.restart();
+		#else
 		m_timeoutLeftSensor.restart();
+		#endif
 	}
 
 	void pingRightSensor()
 	{
-		g_bRightSensorRead = false;
 		#if (SWAP_SENSORS)
-		uint8_t nTrigger = LeftTrigger_pin;
+		g_bLeftSensorRead = false;
 		#else
-		uint8_t nTrigger = RightTrigger_pin;
+		g_bRightSensorRead = false;
 		#endif
+
+		uint8_t nTrigger = RightTrigger_pin;	// Note: Since this pin is phyiscally tied to this timer, still pulse the one labeled "Right"
 		digitalWrite(nTrigger, LOW);
 		delayMicroseconds(2);
 		digitalWrite(nTrigger, HIGH);
-		delayMicroseconds(10);
+		delayMicroseconds(12);
 		digitalWrite(nTrigger, LOW);
+
+		#if (SWAP_SENSORS)
+		m_timeoutLeftSensor.restart();
+		#else
 		m_timeoutRightSensor.restart();
+		#endif
 	}
 
 	long stabilizeLeftReadings(long nReading)
@@ -1362,7 +1374,7 @@ protected:
 
 	void handlePitchBend()
 	{
-		static int  nPitchBendOld = 0;
+		static int nPitchBendOld = 0;
 		static byte nOutOfRangeL = 0;
 		static byte nSpinDial = 29;
 		int nPitchBend = 0;
@@ -1452,7 +1464,7 @@ protected:
 	void handlePortamento()
 	{
 		static byte nPortamentoTimeOld = 0;
-		if (m_nLeftSensorProcessed !=0) {
+		if (m_nLeftSensorProcessed !=0 ) {
 			m_nPortamentoTime = map(m_nLeftSensorProcessed, g_conMinimumDistance, g_conMaximumDistance, m_nDataNear, m_nDataFar);
 			if (m_nPortamentoTime != nPortamentoTimeOld) {
 				digitSplit(m_nPortamentoTime);
@@ -1529,9 +1541,9 @@ protected:
 				nLastValue = nDataRight;
 				if ((m_nLeftSensorProcessed > 0) && (m_nRightSensorProcessed > 0)) {
 					m_nDisplayTimeout = 200;
-					m_ledLeftDigit = 48;
-					m_ledMiddleDigit = 47;
-					m_ledRightDigit = 49;
+					m_ledLeftDigit = 48;		// |-
+					m_ledMiddleDigit = 47;		// --
+					m_ledRightDigit = 49;		// -|
 					startTimerWithPriority(1);
 					m_nDisplayTimeout = 800;
 				}
@@ -1651,11 +1663,11 @@ public:
 		for (byte i = m_nFastActionRatio; i > 0; --i) {
 			checkArticulation();
 			setDisplay();
-			delay(8);		// This ,combined with the above "for loop", is the main driving point for timing
+			delay(6);		// This ,combined with the above "for loop", is the main driving point for timing
 			pingLeftSensor();
-			delay(8);
+			delay(6);
 			pingRightSensor();
-			delay(8);
+			delay(6);
 			m_nLeftSensorProcessed = stabilizeLeftReadings(readLeftSensor());
 			handleLeftSensor();
 
