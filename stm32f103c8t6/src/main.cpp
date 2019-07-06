@@ -447,10 +447,14 @@ uint16_t readADC(uint8_t nPin)
 
 // Timer Interrupts
 
+static constexpr int g_conSensorTimeOut = 5000;
+
 volatile bool g_bLeftSensorRead = false;			// Set when the left sensor reading is acquired
 volatile uint32_t g_nLeftSensorEchoTime = 0;		// Echo time for the Left Ultrasonic sensor in microseconds
 volatile bool g_bRightSensorRead = false;			// Set when the right sensor reading is acquired
 volatile uint32_t g_nRightSensorEchoTime = 0;		// Echo time for the Right Ultrasonic sensor in microseconds
+CTimeoutUS g_timeoutLeftSensor(g_conSensorTimeOut);
+CTimeoutUS g_timeoutRightSensor(g_conSensorTimeOut);
 
 extern "C" void __irq_tim2(void) {
 	uint32_t dsr = (TIMER2->regs.gen->DIER & TIMER2->regs.gen->SR);
@@ -460,12 +464,12 @@ extern "C" void __irq_tim2(void) {
 	if (dsr & TIMER_SR_CC2IF) {
 		uint32_t nValue = TIMER2->regs.gen->CCR2;
 		#if (SWAP_SENSORS)
-		if (nValue && !g_bRightSensorRead) {
+		if (nValue && !g_bRightSensorRead && !g_timeoutRightSensor.hasExpired()) {
 			g_nRightSensorEchoTime = nValue;
 			g_bRightSensorRead = true;
 		}
 		#else
-		if (nValue && !g_bLeftSensorRead) {
+		if (nValue && !g_bLeftSensorRead && !g_timeoutLeftSensor.hasExpired()) {
 			g_nLeftSensorEchoTime = nValue;
 			g_bLeftSensorRead = true;
 		}
@@ -482,12 +486,12 @@ extern "C" void __irq_tim3(void) {
 	if (dsr & TIMER_SR_CC2IF) {
 		uint32_t nValue = TIMER3->regs.gen->CCR2;
 		#if (SWAP_SENSORS)
-		if (nValue && !g_bLeftSensorRead) {
+		if (nValue && !g_bLeftSensorRead && !g_timeoutLeftSensor.hasExpired()) {
 			g_nLeftSensorEchoTime = nValue;
 			g_bLeftSensorRead = true;
 		}
 		#else
-		if (nValue && !g_bRightSensorRead) {
+		if (nValue && !g_bRightSensorRead && !g_timeoutRightSensor.hasExpired()) {
 			g_nRightSensorEchoTime = nValue;
 			g_bRightSensorRead = true;
 		}
@@ -788,7 +792,6 @@ private:
 
 	static constexpr int g_conMinimumDistance = 400;
 	static constexpr int g_conMaximumDistance = 3500;
-	static constexpr int g_conSensorTimeOut = 5000;
 	static constexpr int g_conNoteBufferSpace = 720;
 
 	unsigned long m_nLeftSensorProcessed=0;
@@ -873,9 +876,6 @@ private:
 	unsigned long m_nShortTimeout;
 	unsigned long m_nLongTimeout;
 	byte m_nDisplayPriority = 0;
-
-	CTimeoutUS m_timeoutLeftSensor;
-	CTimeoutUS m_timeoutRightSensor;
 
 protected:
 	void readPotentiometers()
@@ -1282,9 +1282,9 @@ protected:
 		digitalWrite(nTrigger, LOW);
 	
 		#if (SWAP_SENSORS)
-		m_timeoutRightSensor.restart();
+		g_timeoutRightSensor.restart();
 		#else
-		m_timeoutLeftSensor.restart();
+		g_timeoutLeftSensor.restart();
 		#endif
 	}
 
@@ -1304,9 +1304,9 @@ protected:
 		digitalWrite(nTrigger, LOW);
 
 		#if (SWAP_SENSORS)
-		m_timeoutLeftSensor.restart();
+		g_timeoutLeftSensor.restart();
 		#else
-		m_timeoutRightSensor.restart();
+		g_timeoutRightSensor.restart();
 		#endif
 	}
 
@@ -1588,7 +1588,7 @@ protected:
 
 	long readLeftSensor()
 	{
-		while (!m_timeoutLeftSensor.hasExpired() && !g_bLeftSensorRead) { }
+		while (!g_timeoutLeftSensor.hasExpired() && !g_bLeftSensorRead) { }
 		if (g_bLeftSensorRead) {
 			return sensorConstrain(g_nLeftSensorEchoTime);
 		}
@@ -1597,7 +1597,7 @@ protected:
 
 	long readRightSensor()
 	{
-		while (!m_timeoutRightSensor.hasExpired() && !g_bRightSensorRead) { }
+		while (!g_timeoutRightSensor.hasExpired() && !g_bRightSensorRead) { }
 		if (g_bRightSensorRead) {
 			return checkNoteBuffer(sensorConstrain(g_nRightSensorEchoTime));
 		}
@@ -1615,11 +1615,6 @@ protected:
 	}
 
 public:
-	CAltura()
-		:	m_timeoutLeftSensor(g_conSensorTimeOut),
-			m_timeoutRightSensor(g_conSensorTimeOut)
-	{ }
-
 	void init()
 	{
 		//Clear MIDI buffer upon startup
