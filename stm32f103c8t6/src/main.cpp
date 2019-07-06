@@ -783,8 +783,17 @@ static uint8_t digitBitRemap(uint8_t nData)
 			((nData & 0x40) << 1));			// DP
 }
 
-constexpr int32_t g_conMaxADCValue = 4095;			// Maximum ADC reading (STM32F103 has 12-bit ADCs)
+constexpr int32_t g_conADCScale = 4096;				// ADC Range reading (STM32F103 has 12-bit ADCs)
 constexpr int32_t g_conADCThreshold = 15;			// ADC Value Change Threshold (Use 3 for 10-bit ADC, 15 for 12-bit ADC)
+
+// Map ADC binpoint number to scaling
+//		binpoint is the number of bits on the ADC
+static inline uint32_t mapADCvalue(uint32_t nValue, uint32_t nOutScale)
+{
+	nValue *= nOutScale;
+	nValue /= g_conADCScale;
+	return nValue;
+}
 
 class CAltura
 {
@@ -971,7 +980,7 @@ protected:
 	{
 		static int nScaleOld = -1;
 		if (m_arrPot[POT_scalePot] != nScaleOld) {
-			m_nScaleCurrent = map(m_arrPot[POT_scalePot], 0, g_conMaxADCValue, 0, 12);
+			m_nScaleCurrent = mapADCvalue(m_arrPot[POT_scalePot], 12);
 			if (m_nScaleCurrent > 11) {
 				m_nScaleCurrent = 11;
 			}
@@ -990,7 +999,7 @@ protected:
 	{
 		static int nKeyOld = -1;
 		if (m_arrPot[POT_keyPot] != nKeyOld) {
-			m_nKeyCurrent = map(m_arrPot[POT_keyPot], 0, g_conMaxADCValue, 0, 12);
+			m_nKeyCurrent = mapADCvalue(m_arrPot[POT_keyPot], 12);
 			if (m_nKeyCurrent > 11) {
 				m_nKeyCurrent = 11;
 			}
@@ -1013,13 +1022,13 @@ protected:
 		if ((m_arrPot[POT_octaveNearPot] != nOctaveNearOld) ||
 			(m_arrPot[POT_octaveFarPot] != nOctaveFarOld)) {
 			if (m_arrPot[POT_octaveNearPot] != nOctaveNearOld) {
-				m_nOctaveNearCurrent = map(m_arrPot[POT_octaveNearPot], 0, g_conMaxADCValue, 1, m_conOctaveMax+2);
+				m_nOctaveNearCurrent = mapADCvalue(m_arrPot[POT_octaveNearPot], m_conOctaveMax)+1;
 				if (m_nOctaveNearCurrent > m_conOctaveMax) {
 					m_nOctaveNearCurrent = m_conOctaveMax;
 				}
 			}
 			if (m_arrPot[POT_octaveFarPot] != nOctaveFarOld){
-				m_nOctaveFarCurrent = map(m_arrPot[POT_octaveFarPot], 0, g_conMaxADCValue, 1, m_conOctaveMax+2);
+				m_nOctaveFarCurrent = mapADCvalue(m_arrPot[POT_octaveFarPot], m_conOctaveMax)+1;
 				if (m_nOctaveFarCurrent > m_conOctaveMax) {
 					m_nOctaveFarCurrent = m_conOctaveMax;
 				}
@@ -1059,7 +1068,7 @@ protected:
 	{
 		static int nFunctionSelectOld = -1;
 		if (m_arrPot[POT_functionSelectPot] != nFunctionSelectOld) {
-			m_nFunctionSelectCurrent = map(m_arrPot[POT_functionSelectPot], 0, g_conMaxADCValue, 1, 8);
+			m_nFunctionSelectCurrent = mapADCvalue(m_arrPot[POT_functionSelectPot], 7)+1;
 			if (m_nFunctionSelectCurrent > 7) {
 				m_nFunctionSelectCurrent = 7;
 			}
@@ -1088,7 +1097,7 @@ protected:
 		if (m_arrPot[POT_dataNearPot] != m_nDataNearOld) {
 			switch (m_nFunctionSelectCurrent) {
 				case 1:
-					m_nPitchBendNeutralZone = map(m_arrPot[POT_dataNearPot], 0, g_conMaxADCValue, 0, 127);
+					m_nPitchBendNeutralZone = mapADCvalue(m_arrPot[POT_dataNearPot], 128);
 					if (outsidePotBuffer(m_nDataNearOld, m_arrPot[POT_dataNearPot]) && (m_nDisplayPriority < 3)) {
 						startTimerWithPriority(2);
 						digitSplit(m_nPitchBendNeutralZone);
@@ -1101,7 +1110,7 @@ protected:
 					break;
 
 				default:
-					m_nDataNear = map(m_arrPot[POT_dataNearPot], 0, g_conMaxADCValue, 0, 127);
+					m_nDataNear = mapADCvalue(m_arrPot[POT_dataNearPot], 128);
 					if (outsidePotBuffer(m_nDataNearOld, m_arrPot[POT_dataNearPot]) && (m_nDisplayPriority < 3)) {
 						startTimerWithPriority(2);
 						digitSplit(m_nDataNear);
@@ -1114,7 +1123,7 @@ protected:
 		if (m_arrPot[POT_dataFarPot] != m_nDataFarOld) {
 			switch (m_nFunctionSelectCurrent) {
 				case 1:
-					m_nDataFar = map(m_arrPot[POT_dataFarPot], 0, g_conMaxADCValue, 0, 13);
+					m_nDataFar = mapADCvalue(m_arrPot[POT_dataFarPot], 13);
 					if (m_nDataFar > 12) {
 						m_nDataFar = 12;
 					}
@@ -1127,7 +1136,7 @@ protected:
 
 				case 7:
 					if (m_nDisplayPriority <= 1) {
-						m_nMIDIChannel = map(m_arrPot[POT_dataFarPot], 0, g_conMaxADCValue, 1, 17);
+						m_nMIDIChannel = mapADCvalue(m_arrPot[POT_dataFarPot], 16)+1;
 						if (m_nMIDIChannel > 16) {
 							m_nMIDIChannel = 16;
 						}
@@ -1138,7 +1147,7 @@ protected:
 					break;
 
 				default:
-					m_nDataFar = map(m_arrPot[POT_dataFarPot], 0, g_conMaxADCValue, 0, 127);
+					m_nDataFar = mapADCvalue(m_arrPot[POT_dataFarPot], 128);
 					if (outsidePotBuffer(m_nDataFarOld, m_arrPot[POT_dataFarPot]) && (m_nDisplayPriority < 3)) {
 						startTimerWithPriority(2);
 						digitSplit(m_nDataFar);
@@ -1167,14 +1176,14 @@ protected:
 		static int nLeftControlOld;
 		static int nRightControlOld;
 		if (nLeftControlOld != m_arrPot[nLeftControlPot]) {
-			m_nxyLeftControlChange = map(m_arrPot[nLeftControlPot], 0, g_conMaxADCValue, 0, 127);
+			m_nxyLeftControlChange = mapADCvalue(m_arrPot[nLeftControlPot], 128);
 			if (outsidePotBuffer(nLeftControlOld, m_arrPot[nLeftControlPot]) && (m_nDisplayPriority < 3)) {
 				startTimerWithPriority(2);
 				digitSplit(m_nxyLeftControlChange);
 			}
 		}
 		if (nRightControlOld != m_arrPot[nRightControlPot]) {
-			m_nxyRightControlChange = map(m_arrPot[nRightControlPot], 0, g_conMaxADCValue, 0, 127);
+			m_nxyRightControlChange = mapADCvalue(m_arrPot[nRightControlPot], 128);
 			if (outsidePotBuffer(nRightControlOld, m_arrPot[nRightControlPot]) && (m_nDisplayPriority < 3)) {
 				startTimerWithPriority(2);
 				digitSplit(m_nxyRightControlChange);
@@ -1189,14 +1198,14 @@ protected:
 		static int nRightDataFarOld = -1;
 		static int nRightDataNearOld = -1;
 		if (nRightDataFarOld != m_arrPot[nRightDataFarPot]) {
-			m_nxyDataFarRight = map(m_arrPot[nRightDataFarPot], 0, g_conMaxADCValue, 0, 127);
+			m_nxyDataFarRight = mapADCvalue(m_arrPot[nRightDataFarPot], 128);
 			if (outsidePotBuffer(nRightDataFarOld , m_arrPot[nRightDataFarPot]) && (m_nDisplayPriority < 3)) {
 				startTimerWithPriority(2);
 				digitSplit(m_nxyDataFarRight);
 			}
 		}
 		if (nRightDataNearOld != m_arrPot[nRightDataNearPot]) {
-			m_nxyDataNearRight = map(m_arrPot[nRightDataNearPot], 0, g_conMaxADCValue, 0, 127);
+			m_nxyDataNearRight = mapADCvalue(m_arrPot[nRightDataNearPot], 128);
 			if (outsidePotBuffer(nRightDataNearOld , m_arrPot[nRightDataNearPot]) && (m_nDisplayPriority < 3)) {
 				startTimerWithPriority(2);
 				digitSplit(m_nxyDataNearRight);
@@ -1257,7 +1266,7 @@ protected:
 		static int nFastActionRatioOld;
 		if (m_bArticulationMode) {
 			if (m_arrPot[POT_articulationPot] != nFastActionRatioOld) {
-				m_nFastActionRatio = map(m_arrPot[POT_articulationPot], 0, g_conMaxADCValue, 1, 17);
+				m_nFastActionRatio = mapADCvalue(m_arrPot[POT_articulationPot], 16)+1;
 				nFastActionRatioOld = m_arrPot[POT_articulationPot];
 				digitSplit(m_nFastActionRatio * 15);
 				startTimerWithPriority(3);
@@ -1606,7 +1615,7 @@ protected:
 				m_bArticulationMode = false;
 			}
 		}
-		m_nFastActionRatio = map(m_arrPot[POT_articulationPot], 0, g_conMaxADCValue, 1, 17);
+		m_nFastActionRatio = mapADCvalue(m_arrPot[POT_articulationPot], 16)+1;
 	}
 
 public:
