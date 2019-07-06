@@ -1085,7 +1085,7 @@ protected:
 			if ((m_nFunctionSelectCurrent == 6) && !m_bxyMode) {
 				xyModeStart();
 			}
-			if ((m_nFunctionSelectCurrent != 6) && !m_bxyMode) {
+			if ((m_nFunctionSelectCurrent != 6) && m_bxyMode) {
 				xyModeStop();
 			}
 			nFunctionSelectOld = m_arrPot[POT_functionSelectPot];
