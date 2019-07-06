@@ -1523,7 +1523,7 @@ protected:
 				}
 				MIDI.sendControlChange(m_nxyRightControlChange, nDataRight, m_nMIDIChannel);
 				nLastValue = nDataRight;
-				if ((m_nLeftSensorProcessed > 0) && (m_nRightSensorProcessed > 0)) {
+				if (m_nLeftSensorProcessed > 0) {		// If both sensors are active, indicate on the display that can't display both:
 					m_nDisplayTimeout = 200;
 					m_ledLeftDigit = 48;		// |-
 					m_ledMiddleDigit = 47;		// --
