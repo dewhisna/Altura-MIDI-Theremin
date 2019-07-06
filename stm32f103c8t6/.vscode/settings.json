@@ -2,5 +2,8 @@
 	"terminal.integrated.env.linux": {
 		"PATH": "/home/dewhisna/.platformio/penv/bin:/home/dewhisna/.platformio/penv:/home/dewhisna/bin:/home/dewhisna/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin",
 		"PLATFORMIO_CALLER": "vscode"
+	},
+	"files.associations": {
+		"gpio_f1.c": "cpp"
 	}
 }
