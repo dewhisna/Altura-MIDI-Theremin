@@ -455,7 +455,7 @@ volatile uint32_t g_nRightSensorEchoTime = 0;		// Echo time for the Right Ultras
 extern "C" void __irq_tim2(void) {
 	uint32_t dsr = (TIMER2->regs.gen->DIER & TIMER2->regs.gen->SR);
 	if (dsr & TIMER_SR_CC1IF) {
-
+		// Here on overall period timing
 	}
 	if (dsr & TIMER_SR_CC2IF) {
 		uint32_t nValue = TIMER2->regs.gen->CCR2;
@@ -471,18 +471,13 @@ extern "C" void __irq_tim2(void) {
 		}
 		#endif
 	}
-	// ----
-	if (dsr & TIMER_SR_UIF) {
-		// General Timebase:
-		handleSystemTimeTick();
-	}
-	TIMER2->regs.gen->SR = ~(dsr & (TIMER_SR_CC1IF | TIMER_SR_CC2IF | TIMER_SR_CC1OF | TIMER_SR_CC2OF | TIMER_SR_UIF));
+	TIMER2->regs.gen->SR = ~(dsr & (TIMER_SR_CC1IF | TIMER_SR_CC2IF | TIMER_SR_CC1OF | TIMER_SR_CC2OF | TIMER_SR_UIF | TIMER_SR_TIF));
 }
 
 extern "C" void __irq_tim3(void) {
 	uint32_t dsr = (TIMER3->regs.gen->DIER & TIMER3->regs.gen->SR);
 	if (dsr & TIMER_SR_CC1IF) {
-
+		// Here on overall period timing
 	}
 	if (dsr & TIMER_SR_CC2IF) {
 		uint32_t nValue = TIMER3->regs.gen->CCR2;
@@ -498,12 +493,7 @@ extern "C" void __irq_tim3(void) {
 		}
 		#endif
 	}
-	// ----
-	if (dsr & TIMER_SR_UIF) {
-		// General Timebase:
-		handleSystemTimeTick();
-	}
-	TIMER3->regs.gen->SR = ~(dsr & (TIMER_SR_CC1IF | TIMER_SR_CC2IF | TIMER_SR_CC1OF | TIMER_SR_CC2OF | TIMER_SR_UIF));
+	TIMER3->regs.gen->SR = ~(dsr & (TIMER_SR_CC1IF | TIMER_SR_CC2IF | TIMER_SR_CC1OF | TIMER_SR_CC2OF | TIMER_SR_UIF | TIMER_SR_TIF));
 }
 
 extern "C" void __irq_tim4(void) {
@@ -582,18 +572,12 @@ void Timer_Init()
 	(TIMER2->regs).gen->SR = 0;							// Clear any current IRQs
 	nvic_irq_enable(NVIC_TIMER2);						// Enable IRQ callback in NVIC
 	(TIMER2->regs).gen->DIER |= TIMER_DIER_CC2IE;		// Enable IRQ on CCR2 capture (pulse width)
-	if (SYSTEM_TIME_TIMER_BASE == TIMER2->regs.gen) {
-		(TIMER2->regs).gen->DIER |= TIMER_DIER_UIE;		// Start Timer 2 update IRQ for timing purposes
-	}
 
 	// Timer3:
 	(TIMER3->regs).gen->DIER = 0;
 	(TIMER3->regs).gen->SR = 0;							// Clear any current IRQs
 	nvic_irq_enable(NVIC_TIMER3);						// Enable IRQ callback in NVIC
 	(TIMER3->regs).gen->DIER |= TIMER_DIER_CC2IE;		// Enable IRQ on CCR2 capture (pulse width)
-	if (SYSTEM_TIME_TIMER_BASE == TIMER3->regs.gen) {
-		(TIMER3->regs).gen->DIER |= TIMER_DIER_UIE;		// Start Timer 3 update IRQ for timing purposes
-	}
 
 	// Timer4:
 	(TIMER4->regs).gen->DIER = 0;
