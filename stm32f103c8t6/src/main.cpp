@@ -1023,9 +1023,13 @@ private:
 	byte m_nFastActionRatio = 1;
 
 	//MIDI Packet Data -------------------------------------
-	int m_nPitchBendNeutralZone = 10;
-	int m_nPitchBendUp = 1700;
-	int m_nPitchBendDown = 1700;
+	static constexpr int g_conPitchBendSensorMidpoint =				// +/- Sensor range midpoint for PitchBend Up/Down
+			(((g_conMaximumDistance - g_conMinimumDistance)/2)
+				+ g_conMinimumDistance);
+
+	int m_nPitchBendNeutralZone = 10;								// Amount of PitchBend Neutral Zone to add (adjustable)
+	int m_nPitchBendUp = g_conPitchBendSensorMidpoint;
+	int m_nPitchBendDown = g_conPitchBendSensorMidpoint;
 
 	bool m_bPortamentoOn = false;
 	byte m_nPortamentoTime = 0;
@@ -1259,8 +1263,8 @@ protected:
 						startTimerWithPriority(2);
 						digitSplit(m_nPitchBendNeutralZone);
 					}
-					m_nPitchBendUp = 1700 + m_nPitchBendNeutralZone * 4;
-					m_nPitchBendDown = 1700 - m_nPitchBendNeutralZone * 4;
+					m_nPitchBendUp = g_conPitchBendSensorMidpoint + m_nPitchBendNeutralZone * 4;
+					m_nPitchBendDown = g_conPitchBendSensorMidpoint - m_nPitchBendNeutralZone * 4;
 					break;
 
 				case 7:
@@ -1538,9 +1542,9 @@ protected:
 			MIDI.sendControlChange (65, 0, m_nMIDIChannel);
 			MIDIUSB.sendControlChange (65, 0, m_nMIDIChannel);
 		}
-		if (m_nLeftSensorProcessed > m_nPitchBendUp) {
+		if (static_cast<int>(m_nLeftSensorProcessed) > m_nPitchBendUp) {
 			nPitchBend = map(m_nLeftSensorProcessed, m_nPitchBendUp, g_conMaximumDistance, 0, -1023);
-		} else if (m_nLeftSensorProcessed < m_nPitchBendDown) {
+		} else if (static_cast<int>(m_nLeftSensorProcessed) < m_nPitchBendDown) {
 			nPitchBend = map(m_nLeftSensorProcessed, g_conMinimumDistance, m_nPitchBendDown, 1023, 0);
 		} else {
 			nPitchBend = 0;
