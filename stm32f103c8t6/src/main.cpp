@@ -120,6 +120,7 @@ NRST - Pin 7
 #include <Arduino.h>
 #include <util/atomic.h>
 #include <MIDI.h>
+#include <midi_RingBuffer.h>
 #include <TM1637.h>
 #include <USBComposite.h>
 #include <usb_midi_device.h>
@@ -297,6 +298,174 @@ private:
 		usb_midi_setTXEPSize(me->m_txPacketSize);
 		usb_midi_setRXEPSize(me->m_rxPacketSize);
 		return true;
+	}
+
+    typedef midi::RingBuffer<byte, 64> RingBuffer;
+    RingBuffer m_xferTxBuffer;
+    RingBuffer m_xferRxBuffer;
+    int m_CurrentTxPacketByteIndex = 0;
+	bool m_bCurrentTxInSysex = false;
+	union EVENT_t {
+		uint32_t i;
+		uint8_t b[4];
+		MIDI_EVENT_PACKET_t p;
+	} m_CurrentTxPacket;
+
+public: // Serial / Stream API required for template compatibility
+	inline void begin(unsigned inBaudrate)
+	{
+		if (usbMIDIPart.usbReset) usbMIDIPart.usbReset();
+		m_xferRxBuffer.clear();
+		m_xferTxBuffer.clear();
+		resetTx();
+		m_bCurrentTxInSysex = false;
+	}
+
+	inline unsigned available()
+	{
+		return (m_xferRxBuffer.getLength() + (usb_midi_data_available() * sizeof(uint32_t)));
+	}
+
+	inline byte read()
+	{
+		while (usb_midi_data_available()) {
+			// Read the packet and unpack it:
+			union EVENT_t {
+				uint32_t i;
+				uint8_t b[4];
+				MIDI_EVENT_PACKET_t p;
+			} ev;
+			if (usb_midi_rx(&ev.i, 1)) {
+				m_xferRxBuffer.write(ev.b, 4);
+			}
+		}
+		return m_xferRxBuffer.read();
+	}
+
+	inline void write(byte inData)
+	{
+		m_xferTxBuffer.write(inData);
+		while (!m_xferTxBuffer.isEmpty()) {
+			const byte nData = m_xferTxBuffer.read();
+			if (m_CurrentTxPacketByteIndex == 0) {
+				m_CurrentTxPacket.p.cable = DEFAULT_MIDI_CABLE;
+				m_CurrentTxPacket.p.cin = (nData>>4);
+				switch (m_CurrentTxPacket.p.cin) {
+					case 0x08:
+					case 0x09:
+					case 0x0A:
+					case 0x0B:
+					case 0x0C:
+					case 0x0D:
+					case 0x0E:
+						break;				// Channel messages copy straight through
+					case 0x0F:				// Translate Sysex messages:
+						switch (nData) {
+							case 0xF0:		// Sysex Start
+								m_bCurrentTxInSysex = true;
+								m_CurrentTxPacket.p.cin = CIN_SYSEX;	// Assume 3 byte Sysex
+								break;
+							case 0xF7:		// Sysex End
+								m_bCurrentTxInSysex = true;		// Set the flag in case we have a stray F7 without previous F0
+								// Continue and write it as a normal data byte
+								//	and convert the Sysex message packing below
+								break;
+							case 0xF6:		// MIDIv1_TUNE_REQUEST -> CIN_1BYTE (0 data bytes)
+							case 0xF8:		// MIDIv1_CLOCK -> CIN_1BYTE (0 data bytes)
+							case 0xF9:		// MIDIv1_TICK -> CIN_1BYTE (0 data bytes)
+							case 0xFA:		// MIDIv1_START -> CIN_1BYTE (0 data bytes)
+							case 0xFB:		// MIDIv1_CONTINUE -> CIN_1BYTE (0 data bytes)
+							case 0xFC:		// MIDIv1_STOP -> CIN_1BYTE (0 data bytes)
+							case 0xFE:		// MIDIv1_ACTIVE_SENSE -> CIN_1BYTE (0 data bytes)
+							case 0xFF:		// MIDIv1_RESET -> CIN_1BYTE (0 data bytes)
+								m_CurrentTxPacket.p.cin = CIN_1BYTE;
+								break;
+							case 0xF1:		// MIDIv1_MTC_QUARTER_FRAME -> CIN_2BYTE_SYS_COMMON (1 data byte)
+							case 0xF3:		// MIDIv1_SONG_SELECT -> CIN_2BYTE_SYS_COMMON (1 data byte)
+								m_CurrentTxPacket.p.cin = CIN_2BYTE_SYS_COMMON;
+								break;
+							case 0xF2:		// MIDIv1_SONG_POSITION_PTR -> CIN_3BYTE_SYS_COMMON (2 data bytes)
+								m_CurrentTxPacket.p.cin = CIN_3BYTE_SYS_COMMON;
+								break;
+						}
+						break;
+					default:
+						if (!m_bCurrentTxInSysex) {
+							continue;		// Ignore stray bytes outside of normal MIDI messages and Sysex groups
+						} else {
+							// If it's part of Sysex, assume it's
+							//	a full 3-byte packet until we get the end flag
+							m_CurrentTxPacket.p.cin = CIN_SYSEX;
+						}
+						break;
+				}
+			}
+
+			++m_CurrentTxPacketByteIndex;
+			m_CurrentTxPacket.b[m_CurrentTxPacketByteIndex] = nData;
+
+			int nPacketSize = 0;
+
+			if (m_bCurrentTxInSysex && (nData == 0xF7)) {
+				m_bCurrentTxInSysex = false;
+				switch (m_CurrentTxPacketByteIndex) {
+					case 1:
+						m_CurrentTxPacket.p.cin = CIN_SYSEX_ENDS_IN_1;
+						break;
+					case 2:
+						m_CurrentTxPacket.p.cin = CIN_SYSEX_ENDS_IN_2;
+						break;
+					case 3:
+						m_CurrentTxPacket.p.cin = CIN_SYSEX_ENDS_IN_3;
+						break;
+				}
+			} 
+
+			if (!m_bCurrentTxInSysex) {
+				switch (m_CurrentTxPacket.p.cin) {
+					case CIN_1BYTE:				// 1 Byte messages:
+					case CIN_SYSEX_ENDS_IN_1:
+						nPacketSize = 1;
+						break;
+					case CIN_2BYTE_SYS_COMMON:	// 2 Byte messages:
+					case CIN_SYSEX_ENDS_IN_2:
+					case CIN_PROGRAM_CHANGE:
+					case CIN_CHANNEL_PRESSURE:
+						nPacketSize = 2;
+						break;
+					case CIN_3BYTE_SYS_COMMON:	// 3 Byte messages:
+					case CIN_SYSEX:
+					case CIN_SYSEX_ENDS_IN_3:
+					case CIN_NOTE_OFF:
+					case CIN_NOTE_ON:
+					case CIN_AFTER_TOUCH:
+					case CIN_CONTROL_CHANGE:
+					case CIN_PITCH_WHEEL:
+						nPacketSize = 3;
+						break;
+					case CIN_MISC_FUNCTION:		// Reserved for future expansion
+					case CIN_CABLE_EVENT:
+						break;
+				}
+			} else {
+				nPacketSize = 3;		// Assume a full-length packet until we get the Sysex ending
+			}
+
+			if (m_CurrentTxPacketByteIndex >= nPacketSize) {
+				usb_midi_tx(&m_CurrentTxPacket.i, 1);
+				resetTx();
+			}
+		}
+	}
+
+private:
+	void resetTx()
+	{
+		m_CurrentTxPacketByteIndex = 0;
+		m_CurrentTxPacket.b[0] = 0;
+		m_CurrentTxPacket.b[1] = 0;
+		m_CurrentTxPacket.b[2] = 0;
+		m_CurrentTxPacket.b[3] = 0;
 	}
 
 public:
@@ -657,6 +826,8 @@ public:
 		registerComponents();
 	}
 
+	static MyUSBMIDI m_USBMIDI;
+
 protected:
 	void registerComponents()
 	{
@@ -674,13 +845,14 @@ protected:
 private:
 	bool m_bUSBRegistered;
 
-	static MyUSBMIDI m_USBMIDI;
 //	static USBCompositeSerial m_CompositeSerial;
 //	static USBMassStorage m_MassStorage;
 } g_MyUSBComposite;
 MyUSBMIDI MyUSBComposite::m_USBMIDI;
 //USBCompositeSerial MyUSBComposite::m_CompositeSerial;
 //USBMassStorage MyUSBComposite::m_MassStorage;
+
+MIDI_CREATE_INSTANCE(MyUSBMIDI, MyUSBComposite::m_USBMIDI, MIDIUSB)
 
 // ============================================================================
 
@@ -1116,6 +1288,7 @@ protected:
 						digitSplit(m_nDataFar);
 					}
 					MIDI.sendControlChange(20, m_nDataFar, m_nMIDIChannel);
+					MIDIUSB.sendControlChange(20, m_nDataFar, m_nMIDIChannel);
 					break;
 
 				case 7:
@@ -1366,7 +1539,9 @@ protected:
 			m_bPortamentoOn = false;
 			m_nPortamentoTime = 0;
 			MIDI.sendControlChange(5, m_nPortamentoTime, m_nMIDIChannel);
+			MIDIUSB.sendControlChange(5, m_nPortamentoTime, m_nMIDIChannel);
 			MIDI.sendControlChange (65, 0, m_nMIDIChannel);
+			MIDIUSB.sendControlChange (65, 0, m_nMIDIChannel);
 		}
 		if (m_nLeftSensorProcessed > m_nPitchBendUp) {
 			nPitchBend = map(m_nLeftSensorProcessed, m_nPitchBendUp, g_conMaximumDistance, 0, -1023);
@@ -1387,6 +1562,7 @@ protected:
 				startTimerWithPriority(1);
 
 				MIDI.sendPitchBend(0, m_nMIDIChannel);
+				MIDIUSB.sendPitchBend(0, m_nMIDIChannel);
 			}
 		} else {
 			if (nPitchBend != nPitchBendOld) {
@@ -1411,6 +1587,7 @@ protected:
 				nPitchBendOld = nPitchBend;
 				nPitchBend = nPitchBend * 8;
 				MIDI.sendPitchBend(nPitchBend, m_nMIDIChannel);
+				MIDIUSB.sendPitchBend(nPitchBend, m_nMIDIChannel);
 
 				nOutOfRangeL = 0;
 			}
@@ -1426,6 +1603,7 @@ protected:
 				digitSplit(nChannelVolume);
 				startTimerWithPriority(1);
 				MIDI.sendControlChange(7, nChannelVolume, m_nMIDIChannel);
+				MIDIUSB.sendControlChange(7, nChannelVolume, m_nMIDIChannel);
 				nChannelVolumeOld = nChannelVolume;
 			}
 		}
@@ -1440,6 +1618,7 @@ protected:
 				digitSplit(nModulation);
 				startTimerWithPriority(1);
 				MIDI.sendControlChange(1, nModulation, m_nMIDIChannel);
+				MIDIUSB.sendControlChange(1, nModulation, m_nMIDIChannel);
 				nModulationOld = nModulation;
 			}
 		}
@@ -1454,14 +1633,17 @@ protected:
 				digitSplit(m_nPortamentoTime);
 				startTimerWithPriority(1);
 				MIDI.sendControlChange(5, m_nPortamentoTime, m_nMIDIChannel);
+				MIDIUSB.sendControlChange(5, m_nPortamentoTime, m_nMIDIChannel);
 				if (m_nPortamentoTime == 0) {
 					MIDI.sendControlChange(65, 0, m_nMIDIChannel);
+					MIDIUSB.sendControlChange(65, 0, m_nMIDIChannel);
 					if (m_bPortamentoOn) {
 						m_bPortamentoOn = false;
 					}
 				}
 				if (!m_bPortamentoOn && (m_nPortamentoTime != 0)) {
 					MIDI.sendControlChange(65, 127, m_nMIDIChannel);
+					MIDIUSB.sendControlChange(65, 127, m_nMIDIChannel);
 					m_bPortamentoOn=true;
 				}
 				nPortamentoTimeOld = m_nPortamentoTime;
@@ -1507,6 +1689,7 @@ protected:
 				startTimerWithPriority(0);
 			}
 			MIDI.sendControlChange(m_nxyLeftControlChange, nDataLeft, m_nMIDIChannel);
+			MIDIUSB.sendControlChange(m_nxyLeftControlChange, nDataLeft, m_nMIDIChannel);
 			nLastValue = nDataLeft;
 		}
 	}
@@ -1522,6 +1705,7 @@ protected:
 					startTimerWithPriority(0);
 				}
 				MIDI.sendControlChange(m_nxyRightControlChange, nDataRight, m_nMIDIChannel);
+				MIDIUSB.sendControlChange(m_nxyRightControlChange, nDataRight, m_nMIDIChannel);
 				nLastValue = nDataRight;
 				if (m_nLeftSensorProcessed > 0) {		// If both sensors are active, indicate on the display that can't display both:
 					m_nDisplayTimeout = 200;
@@ -1550,6 +1734,7 @@ protected:
 			}
 			if ((nOutOfRange > 5) && bNotePlaying) {
 				MIDI.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
+				MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 				nOutOfRange = 0;
 				bNotePlaying = false;
 			}
@@ -1565,11 +1750,14 @@ protected:
 			if (!bNotePlaying) {
 				bNotePlaying = true;
 				MIDI.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
+				MIDIUSB.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
 				nOldNote = nCurrentNote;
 			} else {
 				if (nCurrentNote != nOldNote) {
 					MIDI.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
+					MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 					MIDI.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
+					MIDIUSB.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
 					bNotePlaying = true;
 					nOldNote = nCurrentNote;
 				}
@@ -1621,7 +1809,9 @@ public:
 		byte startupBuffer[2] = {0,0};
 
 		MIDI.sendSysEx(2, startupBuffer, false);
+		MIDIUSB.sendSysEx(2, startupBuffer, false);
 		MIDI.sendProgramChange(81, m_nMIDIChannel);		// Typically a square lead, appropriate to a theremin
+		MIDIUSB.sendProgramChange(81, m_nMIDIChannel);
 
 		readPotentiometers();
 		initializeArticulation();
