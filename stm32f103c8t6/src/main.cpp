@@ -1118,7 +1118,7 @@ protected:
 
 	bool outsidePotBuffer(int oldValue, int newValue)
 	{
-		return ((oldValue >= (newValue + g_conADCThreshold)) || ((oldValue <= (newValue - g_conADCThreshold)) && (oldValue >= 0)));
+		return (((oldValue >= (newValue + g_conADCThreshold)) || (oldValue <= (newValue - g_conADCThreshold))) && (oldValue >= 0));
 	}
 
 	void startupDisplay()
