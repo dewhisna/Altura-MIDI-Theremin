@@ -323,10 +323,28 @@ public: // Serial / Stream API required for template compatibility
 
 	inline unsigned available()
 	{
-		return (m_xferRxBuffer.getLength() + (usb_midi_data_available() * sizeof(uint32_t)));
+		pumpRxEvents();
+		return (m_xferRxBuffer.getLength());
 	}
 
 	inline byte read()
+	{
+		pumpRxEvents();
+		if (!m_xferRxBuffer.isEmpty()) {
+			return m_xferRxBuffer.read();
+		} else {
+			return 0;
+		}
+	}
+
+	inline void write(byte inData)
+	{
+		m_xferTxBuffer.write(inData);
+		pumpTxEvents();
+	}
+
+protected:
+	void pumpRxEvents()
 	{
 		while (usb_midi_data_available()) {
 			// Read the packet and unpack it:
@@ -336,15 +354,41 @@ public: // Serial / Stream API required for template compatibility
 				MIDI_EVENT_PACKET_t p;
 			} ev;
 			if (usb_midi_rx(&ev.i, 1)) {
-				m_xferRxBuffer.write(ev.b, 4);
+				switch (ev.p.cin) {
+					case CIN_1BYTE:				// 1 Byte messages:
+					case CIN_SYSEX_ENDS_IN_1:
+						// handleMIDIdata(ev.p.midi0);
+						m_xferRxBuffer.write(ev.p.midi0);
+						break;
+					case CIN_2BYTE_SYS_COMMON:	// 2 Byte messages:
+					case CIN_SYSEX_ENDS_IN_2:
+					case CIN_PROGRAM_CHANGE:
+					case CIN_CHANNEL_PRESSURE:
+						m_xferRxBuffer.write(ev.p.midi0);
+						m_xferRxBuffer.write(ev.p.midi1);
+						break;
+					case CIN_3BYTE_SYS_COMMON:	// 3 Byte messages:
+					case CIN_SYSEX:
+					case CIN_SYSEX_ENDS_IN_3:
+					case CIN_NOTE_OFF:
+					case CIN_NOTE_ON:
+					case CIN_AFTER_TOUCH:
+					case CIN_CONTROL_CHANGE:
+					case CIN_PITCH_WHEEL:
+						m_xferRxBuffer.write(ev.p.midi0);
+						m_xferRxBuffer.write(ev.p.midi1);
+						m_xferRxBuffer.write(ev.p.midi2);
+						break;
+					case CIN_MISC_FUNCTION:		// Reserved for future expansion
+					case CIN_CABLE_EVENT:
+						break;
+				}
 			}
 		}
-		return m_xferRxBuffer.read();
 	}
 
-	inline void write(byte inData)
+	void pumpTxEvents()
 	{
-		m_xferTxBuffer.write(inData);
 		while (!m_xferTxBuffer.isEmpty()) {
 			const byte nData = m_xferTxBuffer.read();
 			if (m_CurrentTxPacketByteIndex == 0) {
@@ -474,60 +518,6 @@ public:
 		return USBComposite.add(&usbMIDIPart, this, (USBPartInitializer)&MyUSBMIDI::init);
 	}
 };
-
-// ============================================================================
-
-static void pumpSerialEvents(bool bDispatch = true)
-{
-	// MIDI Mode : Check for new data in the USART buffer
-	while (g_USARTMIDI.haveBufferData()) {
-		uint8_t nData = g_USARTMIDI.popFromBuffer();
-		// Work on the data
-//		if (bDispatch) g_MIDIFileProcessor.handleMIDIdata(nData);
-	}
-
-	// MIDI Mode : Check for new data in the USB buffer
-	while (usb_midi_data_available()) {
-		// Read the packet and unpack it:
-		union EVENT_t {
-			uint32_t i;
-			uint8_t b[4];
-			MIDI_EVENT_PACKET_t p;
-		} ev;
-		if (usb_midi_rx(&ev.i, 1)) {
-			if (bDispatch) {
-				switch (ev.p.cin) {
-					case CIN_1BYTE:				// 1 Byte messages:
-					case CIN_SYSEX_ENDS_IN_1:
-						// handleMIDIdata(ev.p.midi0);
-						break;
-					case CIN_2BYTE_SYS_COMMON:	// 2 Byte messages:
-					case CIN_SYSEX_ENDS_IN_2:
-					case CIN_PROGRAM_CHANGE:
-					case CIN_CHANNEL_PRESSURE:
-						// handleMIDIdata(ev.p.midi0);
-						// handleMIDIdata(ev.p.midi1);
-						break;
-					case CIN_3BYTE_SYS_COMMON:	// 3 Byte messages:
-					case CIN_SYSEX:
-					case CIN_SYSEX_ENDS_IN_3:
-					case CIN_NOTE_OFF:
-					case CIN_NOTE_ON:
-					case CIN_AFTER_TOUCH:
-					case CIN_CONTROL_CHANGE:
-					case CIN_PITCH_WHEEL:
-						// handleMIDIdata(ev.p.midi0);
-						// handleMIDIdata(ev.p.midi1);
-						// handleMIDIdata(ev.p.midi2);
-						break;
-					case CIN_MISC_FUNCTION:		// Reserved for future expansion
-					case CIN_CABLE_EVENT:
-						break;
-				}
-			}
-		}
-	}
-}
 
 // ============================================================================
 
@@ -853,6 +843,25 @@ MyUSBMIDI MyUSBComposite::m_USBMIDI;
 //USBMassStorage MyUSBComposite::m_MassStorage;
 
 MIDI_CREATE_INSTANCE(MyUSBMIDI, MyUSBComposite::m_USBMIDI, MIDIUSB)
+
+// ============================================================================
+
+void pumpSerialEvents(bool bDispatch = true)
+{
+	// Check USART:
+	while (g_USARTMIDI.available()) {
+		uint8_t nData = g_USARTMIDI.read();
+		// Work on the data
+//		if (bDispatch) g_MIDIFileProcessor.handleMIDIdata(nData);
+	}
+
+	// Check USB:
+	while (MyUSBComposite::m_USBMIDI.available()) {
+		uint8_t nData = MyUSBComposite::m_USBMIDI.read();
+		// Work on the data
+//		if (bDispatch) g_MIDIFileProcessor.handleMIDIdata(nData);
+	}
+}
 
 // ============================================================================
 
