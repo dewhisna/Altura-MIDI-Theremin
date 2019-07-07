@@ -974,6 +974,7 @@ private:
 	static constexpr int g_conMinimumDistance = 400;
 	static constexpr int g_conMaximumDistance = 3500;
 	static constexpr int g_conNoteBufferSpace = 720;
+	static constexpr byte g_conNoteOnOutOfRangeThreshold = 25;	// Number of cycles for sensor out-of-range before note off
 
 	unsigned long m_nLeftSensorProcessed=0;
 	unsigned long m_nRightSensorProcessed=0;
@@ -1717,10 +1718,10 @@ protected:
 		if (sensorReading == 0) {
 			m_nLastNote = -10;
 
-			if (nOutOfRange <= 5) {
+			if (nOutOfRange <= g_conNoteOnOutOfRangeThreshold) {
 				++nOutOfRange;
 			}
-			if ((nOutOfRange > 5) && bNotePlaying) {
+			if ((nOutOfRange > g_conNoteOnOutOfRangeThreshold) && bNotePlaying) {
 				MIDI.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 				MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 				nOutOfRange = 0;
