@@ -140,6 +140,10 @@ NRST - Pin 7
 #define Q(text) #text
 #define QUOTE(text) Q(text)
 
+#ifndef UNUSED
+#define UNUSED(x) ((void)(x))
+#endif
+
 // ============================================================================
 
 #define GIT_VERSION_STR QUOTE(GIT_VERSION)
@@ -853,6 +857,7 @@ void pumpSerialEvents(bool bDispatch = true)
 		uint8_t nData = g_USARTMIDI.read();
 		// Work on the data
 //		if (bDispatch) g_MIDIFileProcessor.handleMIDIdata(nData);
+		UNUSED(nData);
 	}
 
 	// Check USB:
@@ -860,6 +865,7 @@ void pumpSerialEvents(bool bDispatch = true)
 		uint8_t nData = MyUSBComposite::m_USBMIDI.read();
 		// Work on the data
 //		if (bDispatch) g_MIDIFileProcessor.handleMIDIdata(nData);
+		UNUSED(nData);
 	}
 }
 
