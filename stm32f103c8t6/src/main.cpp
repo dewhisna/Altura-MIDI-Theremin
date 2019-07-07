@@ -1063,10 +1063,10 @@ private:
 	byte m_ledMiddleDigit = 0;
 	byte m_ledRightDigit = 0;
 
+	static constexpr unsigned long g_conLongTimeout = 60000ul;		// Long display timeout (until screen blank) in milliseconds
 	int m_nDisplayTimeout = 2000;
-	unsigned long m_nCurrentMillis;
-	unsigned long m_nShortTimeout;
-	unsigned long m_nLongTimeout;
+	CTimeoutMS m_timeoutShort;
+	CTimeoutMS m_timeoutLong;
 	byte m_nDisplayPriority = 0;
 
 protected:
@@ -1118,11 +1118,10 @@ protected:
 		digitSplit2(number);
 	}
 
-	void startTimerWithPriority(byte priority)
+	void startTimerWithPriority(byte priority, int nTimeoutOverride = -1)
 	{
-		m_nCurrentMillis = millis();
-		m_nShortTimeout = m_nCurrentMillis + m_nDisplayTimeout;
-		m_nLongTimeout = m_nCurrentMillis + 60000;
+		m_timeoutShort.restart((nTimeoutOverride != -1) ? nTimeoutOverride : m_nDisplayTimeout);
+		m_timeoutLong.restart();
 		m_nDisplayPriority = priority;		//used to prevent certain sections from running until reverting to the default display
 	}
 
@@ -1404,10 +1403,9 @@ protected:
 
 	void checkTimeouts()
 	{
-		m_nCurrentMillis = millis();
-		if (m_nLongTimeout < m_nCurrentMillis) {
+		if (m_timeoutLong.hasExpired()) {
 			wipeDisplay();
-		} else if (m_nShortTimeout < m_nCurrentMillis) {
+		} else if (m_timeoutShort.hasExpired()) {
 			defaultDisplay();
 			if (m_bxyMode) {
 				m_ledLeftDigit = 47;		// --
@@ -1707,12 +1705,10 @@ protected:
 				MIDIUSB.sendControlChange(m_nxyRightControlChange, nDataRight, m_nMIDIChannel);
 				nLastValue = nDataRight;
 				if (m_nLeftSensorProcessed > 0) {		// If both sensors are active, indicate on the display that can't display both:
-					m_nDisplayTimeout = 200;
 					m_ledLeftDigit = 48;		// |-
 					m_ledMiddleDigit = 47;		// --
 					m_ledRightDigit = 49;		// -|
-					startTimerWithPriority(1);
-					m_nDisplayTimeout = 800;
+					startTimerWithPriority(1, 200);
 				}
 			}
 		}
@@ -1739,8 +1735,7 @@ protected:
 			}
 		} else {
 			nOutOfRange = 0;
-			m_nCurrentMillis = millis();
-			m_nLongTimeout = m_nCurrentMillis + 60000;
+			m_timeoutLong.restart();
 			byte newNote = map(sensorReading, g_conMinimumDistance, g_conMaximumDistance, 0, m_nNotesInCurrentScale + 1);
 			if (newNote > m_nNotesInCurrentScale) newNote=m_nNotesInCurrentScale;
 			m_nLastNote = newNote;
@@ -1802,6 +1797,12 @@ protected:
 	}
 
 public:
+	CAltura()
+		:	m_timeoutShort(m_nDisplayTimeout),
+			m_timeoutLong(g_conLongTimeout)
+	{ }
+
+
 	void init()
 	{
 		//Clear MIDI buffer upon startup
