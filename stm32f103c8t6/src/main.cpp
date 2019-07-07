@@ -831,6 +831,7 @@ protected:
 		}
 		USBComposite.clear();
 		m_USBMIDI.registerComponent();
+		m_USBMIDI.begin(MIDIv1_BAUD_RATE);
 //		m_CompositeSerial.registerComponent();
 		USBComposite.begin();
 		m_bUSBRegistered = true;
@@ -1287,9 +1288,9 @@ protected:
 					if (outsidePotBuffer(m_nDataFarOld, m_arrPot[POT_dataFarPot]) && (m_nDisplayPriority < 3)) {
 						startTimerWithPriority(2);
 						digitSplit(m_nDataFar);
+						MIDI.sendControlChange(20, m_nDataFar, m_nMIDIChannel);
+						MIDIUSB.sendControlChange(20, m_nDataFar, m_nMIDIChannel);
 					}
-					MIDI.sendControlChange(20, m_nDataFar, m_nMIDIChannel);
-					MIDIUSB.sendControlChange(20, m_nDataFar, m_nMIDIChannel);
 					break;
 
 				case 7:
@@ -1306,7 +1307,6 @@ protected:
 					if (outsidePotBuffer(m_nDataFarOld, m_arrPot[POT_dataFarPot]) && (m_nDisplayPriority < 3)) {
 						startTimerWithPriority(2);
 						digitSplit(m_nDataFar);
-
 					}
 					break;
 			}
