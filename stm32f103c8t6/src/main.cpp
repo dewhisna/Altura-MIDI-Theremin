@@ -1146,9 +1146,6 @@ protected:
 		static int nScaleOld = -1;
 		if (m_arrPot[POT_scalePot] != nScaleOld) {
 			m_nScaleCurrent = mapADCvalue(m_arrPot[POT_scalePot], 12);
-			if (m_nScaleCurrent > 11) {
-				m_nScaleCurrent = 11;
-			}
 			m_nNotesInCurrentScale = m_nNumberOfOctavesCurrent * g_scales[m_nScaleCurrent][12] ;
 			m_nNoteBuffer =  g_conNoteBufferSpace / m_nNotesInCurrentScale;
 			setScale();
@@ -1165,9 +1162,6 @@ protected:
 		static int nKeyOld = -1;
 		if (m_arrPot[POT_keyPot] != nKeyOld) {
 			m_nKeyCurrent = mapADCvalue(m_arrPot[POT_keyPot], 12);
-			if (m_nKeyCurrent > 11) {
-				m_nKeyCurrent = 11;
-			}
 			setScale();
 
 			if (outsidePotBuffer(nKeyOld, m_arrPot[POT_keyPot]) && (m_nDisplayPriority < 3)) {
@@ -1188,15 +1182,9 @@ protected:
 			(m_arrPot[POT_octaveFarPot] != nOctaveFarOld)) {
 			if (m_arrPot[POT_octaveNearPot] != nOctaveNearOld) {
 				m_nOctaveNearCurrent = mapADCvalue(m_arrPot[POT_octaveNearPot], m_conOctaveMax)+1;
-				if (m_nOctaveNearCurrent > m_conOctaveMax) {
-					m_nOctaveNearCurrent = m_conOctaveMax;
-				}
 			}
 			if (m_arrPot[POT_octaveFarPot] != nOctaveFarOld){
 				m_nOctaveFarCurrent = mapADCvalue(m_arrPot[POT_octaveFarPot], m_conOctaveMax)+1;
-				if (m_nOctaveFarCurrent > m_conOctaveMax) {
-					m_nOctaveFarCurrent = m_conOctaveMax;
-				}
 			}
 
 			nSlopeCurrent = (m_nOctaveFarCurrent + m_conOctaveMax) - m_nOctaveNearCurrent;
@@ -1234,9 +1222,6 @@ protected:
 		static int nFunctionSelectOld = -1;
 		if (m_arrPot[POT_functionSelectPot] != nFunctionSelectOld) {
 			m_nFunctionSelectCurrent = mapADCvalue(m_arrPot[POT_functionSelectPot], 7)+1;
-			if (m_nFunctionSelectCurrent > 7) {
-				m_nFunctionSelectCurrent = 7;
-			}
 			if (outsidePotBuffer(nFunctionSelectOld, m_arrPot[POT_functionSelectPot])) {
 				startTimerWithPriority(3);
 				m_ledRightDigit = 22;
@@ -1289,9 +1274,6 @@ protected:
 			switch (m_nFunctionSelectCurrent) {
 				case 1:
 					m_nDataFar = mapADCvalue(m_arrPot[POT_dataFarPot], 13);
-					if (m_nDataFar > 12) {
-						m_nDataFar = 12;
-					}
 					if (outsidePotBuffer(m_nDataFarOld, m_arrPot[POT_dataFarPot]) && (m_nDisplayPriority < 3)) {
 						startTimerWithPriority(2);
 						digitSplit(m_nDataFar);
@@ -1303,9 +1285,6 @@ protected:
 				case 7:
 					if (m_nDisplayPriority <= 1) {
 						m_nMIDIChannel = mapADCvalue(m_arrPot[POT_dataFarPot], 16)+1;
-						if (m_nMIDIChannel > 16) {
-							m_nMIDIChannel = 16;
-						}
 
 						startTimerWithPriority(1);
 						digitSplit(m_nMIDIChannel);
