@@ -981,7 +981,7 @@ private:
 	static constexpr int g_conMinimumDistance = 400;
 	static constexpr int g_conMaximumDistance = 3500;
 	static constexpr int g_conNoteBufferSpace = 720;
-	static constexpr byte g_conNoteOnOutOfRangeThreshold = 25;	// Number of cycles for sensor out-of-range before note off
+	static constexpr unsigned int g_conNoteOnOutOfRangeThreshold = 7;	// Number of cycles for sensor out-of-range before note off
 
 	unsigned long m_nLeftSensorProcessed=0;
 	unsigned long m_nRightSensorProcessed=0;
@@ -992,7 +992,7 @@ private:
 
 	int m_nNoteBuffer = g_conNoteBufferSpace / m_nNotesInCurrentScale;
 
-	int m_nLastNote = 0;
+	int m_nLastNote = 0;							// Last note in the scale played, used for checking the noteBuffer on the right-hand input
 
 	const byte m_conOctaveMax = 8;
 	int m_nOctaveNearCurrent = 5;
@@ -1716,18 +1716,17 @@ protected:
 
 	void handleRightSensor(long sensorReading)
 	{
+		byte nCurrentNote;
 		static bool bNotePlaying = false;
-		static byte nCurrentNote;
-		static byte nOldNote;
-		static byte nOutOfRange = 0;
+		static byte nOldNote = 0x7F;
+		static unsigned int nOutOfRange = 0;
 
 		if (sensorReading == 0) {
-			m_nLastNote = -10;
+			m_nLastNote = -1;
 
 			if (nOutOfRange <= g_conNoteOnOutOfRangeThreshold) {
 				++nOutOfRange;
-			}
-			if ((nOutOfRange > g_conNoteOnOutOfRangeThreshold) && bNotePlaying) {
+			} else if (bNotePlaying) {
 				MIDI.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 				MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 				nOutOfRange = 0;
@@ -1737,31 +1736,29 @@ protected:
 			nOutOfRange = 0;
 			m_timeoutLong.restart();
 			byte newNote = map(sensorReading, g_conMinimumDistance, g_conMaximumDistance, 0, m_nNotesInCurrentScale + 1);
-			if (newNote > m_nNotesInCurrentScale) newNote=m_nNotesInCurrentScale;
+			if (newNote > m_nNotesInCurrentScale) newNote = m_nNotesInCurrentScale;
 			m_nLastNote = newNote;
 			nCurrentNote = m_arrMIDINotes[newNote];
 
 			if (!bNotePlaying) {
-				bNotePlaying = true;
 				MIDI.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
 				MIDIUSB.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
-				nOldNote = nCurrentNote;
-			} else {
-				if (nCurrentNote != nOldNote) {
-					MIDI.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
-					MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
-					MIDI.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
-					MIDIUSB.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
-					bNotePlaying = true;
-					nOldNote = nCurrentNote;
-				}
+			} else if (nCurrentNote != nOldNote) {
+				MIDI.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
+				MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
+				MIDI.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
+				MIDIUSB.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
 			}
+
+			bNotePlaying = true;
+			nOldNote = nCurrentNote;
 		}
 	}
 
 	long checkNoteBuffer(long reading)
 	{
-		if ((reading > (map(m_nLastNote + 1, 0, m_nNotesInCurrentScale + 1, g_conMinimumDistance, g_conMaximumDistance) + m_nNoteBuffer)) ||
+		if ((m_nLastNote < 0) ||
+			(reading > (map(m_nLastNote+1, 0, m_nNotesInCurrentScale + 1, g_conMinimumDistance, g_conMaximumDistance) + m_nNoteBuffer)) ||
 			(reading < (map(m_nLastNote, 0, m_nNotesInCurrentScale + 1, g_conMinimumDistance, g_conMaximumDistance) - m_nNoteBuffer))) {
 			m_nRightSensorProcessed = reading;
 		}
