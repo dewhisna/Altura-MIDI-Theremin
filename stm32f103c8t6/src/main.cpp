@@ -975,8 +975,8 @@ class CAltura
 {
 private:
 	// Sensor Setup -----------------------------------------
-	static constexpr byte g_conLeftHandBufferAmount = 16;		// try to keep as a power of 2
-	static constexpr byte g_conRightHandBufferAmount = 16;		// try to keep as a power of 2
+	static constexpr int g_conLeftHandBufferAmount = 4;			// try to keep as a power of 2
+	static constexpr int g_conRightHandBufferAmount = 4;		// try to keep as a power of 2
 
 	static constexpr int g_conMinimumDistance = 400;
 	static constexpr int g_conMaximumDistance = 3500;
@@ -1474,38 +1474,70 @@ protected:
 
 	long stabilizeLeftReadings(long nReading)
 	{
-		static byte nPointer = 0;
+		static int nPointer = 0;
 		static int arrLeftReadings[g_conLeftHandBufferAmount] = { };
+		static bool bBufferFull = false;
+		static int nZeroCount = 0;
 
-		if (nReading == 0) return nReading;
+		int nBufCount = g_conLeftHandBufferAmount;
 
-		arrLeftReadings[nPointer] = nReading;
-		++nPointer;
-		if (nPointer >= g_conLeftHandBufferAmount) nPointer = 0;
+		if (nReading == 0) {
+			if (nZeroCount == g_conLeftHandBufferAmount) {
+				bBufferFull = 0;
+				nPointer = 0;
+				return 0;
+			}
+			++nZeroCount;
+		} else {
+			nZeroCount = 0;
+			arrLeftReadings[nPointer] = nReading;
+			++nPointer;
+			if (nPointer >= g_conLeftHandBufferAmount) {
+				nPointer = 0;
+				bBufferFull = true;
+			}
+		}
+		if (!bBufferFull && (nPointer != 0)) nBufCount = nPointer;
 
 		int nReadingsTotal = 0;
 		for (int j = 0; j < g_conLeftHandBufferAmount; j++) {
 			nReadingsTotal = nReadingsTotal + arrLeftReadings[j];
 		}
-		return nReadingsTotal / g_conLeftHandBufferAmount;
+		return nReadingsTotal / nBufCount;
 	}
 
 	long stabilizeRightReadings(long nReading)
 	{
-		static byte nPointer = 0;
+		static int nPointer = 0;
 		static int arrRightReadings[g_conRightHandBufferAmount] = { };
+		static bool bBufferFull = false;
+		static int nZeroCount = 0;
 
-		if (nReading == 0) return nReading;
+		int nBufCount = g_conRightHandBufferAmount;
 
-		arrRightReadings[nPointer] = nReading;
-		++nPointer;
-		if (nPointer >= g_conRightHandBufferAmount) nPointer = 0;
+		if (nReading == 0) {
+			if (nZeroCount == g_conRightHandBufferAmount) {
+				bBufferFull = 0;
+				nPointer = 0;
+				return 0;
+			}
+			++nZeroCount;
+		} else {
+			nZeroCount = 0;
+			arrRightReadings[nPointer] = nReading;
+			++nPointer;
+			if (nPointer >= g_conRightHandBufferAmount) {
+				nPointer = 0;
+				bBufferFull = true;
+			}
+		}
+		if (!bBufferFull && (nPointer != 0)) nBufCount = nPointer;
 
 		int nReadingsTotal = 0;
 		for (int j = 0; j < g_conRightHandBufferAmount; j++) {
 			nReadingsTotal = nReadingsTotal + arrRightReadings[j];
 		}
-		return nReadingsTotal / g_conRightHandBufferAmount;
+		return nReadingsTotal / nBufCount;
 	}
 
 	void handleVelocity()
