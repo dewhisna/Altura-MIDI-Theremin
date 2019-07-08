@@ -986,13 +986,13 @@ private:
 	unsigned long m_nLeftSensorProcessed=0;
 	unsigned long m_nRightSensorProcessed=0;
 
-	byte m_nNotesInCurrentScale = 15;
-	byte m_nScaleCurrent;
-	byte m_nKeyCurrent;
+	int m_nNotesInCurrentScale = 15;
+	int m_nScaleCurrent;
+	int m_nKeyCurrent;
 
 	int m_nNoteBuffer = g_conNoteBufferSpace / m_nNotesInCurrentScale;
 
-	int m_nLastNote = 0;							// Last note in the scale played, used for checking the noteBuffer on the right-hand input
+	int m_nLastNote = -1;							// Last note in the scale played, used for checking the noteBuffer on the right-hand input
 
 	const byte m_conOctaveMax = 8;
 	int m_nOctaveNearCurrent = 5;
@@ -1039,8 +1039,7 @@ private:
 
 	byte m_nMIDIChannel = 1;
 
-	//volitile handle with care------------------------------------
-	volatile byte m_arrMIDINotes[109];
+	byte m_arrMIDINotes[109];
 
 
 	enum POT_CHANNEL_ENUM {
@@ -1738,7 +1737,6 @@ protected:
 
 	void handleRightSensor(long sensorReading)
 	{
-		byte nCurrentNote;
 		static bool bNotePlaying = false;
 		static byte nOldNote = 0x7F;
 		static unsigned int nOutOfRange = 0;
@@ -1751,16 +1749,16 @@ protected:
 			} else if (bNotePlaying) {
 				MIDI.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 				MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
-				nOutOfRange = 0;
 				bNotePlaying = false;
+				nOldNote = 0x7F;
 			}
 		} else {
 			nOutOfRange = 0;
 			m_timeoutLong.restart();
-			byte newNote = map(sensorReading, g_conMinimumDistance, g_conMaximumDistance, 0, m_nNotesInCurrentScale + 1);
+			int newNote = map(sensorReading, g_conMinimumDistance, g_conMaximumDistance, 0, m_nNotesInCurrentScale + 1);
 			if (newNote > m_nNotesInCurrentScale) newNote = m_nNotesInCurrentScale;
 			m_nLastNote = newNote;
-			nCurrentNote = m_arrMIDINotes[newNote];
+			byte nCurrentNote = m_arrMIDINotes[newNote];
 
 			if (!bNotePlaying) {
 				MIDI.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
@@ -1770,7 +1768,7 @@ protected:
 				MIDIUSB.sendNoteOn(nOldNote, 0, m_nMIDIChannel);
 				MIDI.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
 				MIDIUSB.sendNoteOn(nCurrentNote, m_nNoteVelocity, m_nMIDIChannel);
-			}
+			}	// otherwise it's already playing this same note
 
 			bNotePlaying = true;
 			nOldNote = nCurrentNote;
@@ -1779,7 +1777,8 @@ protected:
 
 	long checkNoteBuffer(long reading)
 	{
-		if ((m_nLastNote < 0) ||
+		if ((reading == 0) ||
+			(m_nLastNote < 0) ||
 			(reading > (map(m_nLastNote+1, 0, m_nNotesInCurrentScale + 1, g_conMinimumDistance, g_conMaximumDistance) + m_nNoteBuffer)) ||
 			(reading < (map(m_nLastNote, 0, m_nNotesInCurrentScale + 1, g_conMinimumDistance, g_conMaximumDistance) - m_nNoteBuffer))) {
 			m_nRightSensorProcessed = reading;
@@ -1800,7 +1799,7 @@ protected:
 	{
 		while (!g_timeoutRightSensor.hasExpired() && !g_bRightSensorRead) { }
 		if (g_bRightSensorRead) {
-			return checkNoteBuffer(sensorConstrain(g_nRightSensorEchoTime));
+			return sensorConstrain(g_nRightSensorEchoTime);
 		}
 		return 0;
 	}
@@ -1875,7 +1874,7 @@ public:
 		if (!m_bxyMode) {
 			pingRightSensor();
 			checkPots();
-			handleRightSensor(readRightSensor());
+			handleRightSensor(checkNoteBuffer(readRightSensor()));
 		}
 	}
 } g_Altura;
