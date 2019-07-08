@@ -1058,7 +1058,7 @@ private:
 	static constexpr byte g_nTotalChannels = 8;
 	static_assert(g_nTotalChannels == POT_END_OF_LIST, "Pot Channel List is invalid");
 
-	int m_arrPot[g_nTotalChannels];
+	int m_arrPot[g_nTotalChannels] = { };
 
 	byte m_ledLeftDigit = 0;
 	byte m_ledMiddleDigit = 0;
@@ -1086,8 +1086,8 @@ protected:
 	void setScale()
 	{
 		if(m_bDescending){
-			m_arrMIDINotes[m_nNotesInCurrentScale] = m_nKeyCurrent + (m_nOctaveFarCurrent * 12);
-			for (int note = m_nNotesInCurrentScale; note >= 0; note--) {
+			m_arrMIDINotes[m_nNotesInCurrentScale+1] = m_nKeyCurrent + (m_nOctaveFarCurrent * 12);
+			for (int note = m_nNotesInCurrentScale+1; note > 0; note--) {
 				m_arrMIDINotes[note - 1] = m_arrMIDINotes[note] + g_scales[m_nScaleCurrent][(m_nNotesInCurrentScale - note) % g_scales[m_nScaleCurrent][12]];
 			}
 		} else {
@@ -1814,6 +1814,7 @@ public:
 		MIDIUSB.sendProgramChange(81, m_nMIDIChannel);
 
 		readPotentiometers();
+		setScale();
 		initializeArticulation();
 		if (m_bArticulationMode) {	// Display the software version (2.1.2)
 			m_ledLeftDigit = 45;
