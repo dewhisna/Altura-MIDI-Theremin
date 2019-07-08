@@ -201,7 +201,7 @@ constexpr uint16_t USBMIDI_PID = USBMIDIID_PID(USB_MIDI_ID_TO_USE);				// MIDI U
 
 // Pin definitions:
 
-#define SWAP_SENSORS		true		// If 'true' the left and right sensors will be swapped
+#define SWAP_SENSORS		false		// If 'true' the left and right sensors will be swapped
 
 #define LeftTrigger_pin		PB3
 #define LeftEcho_pin		PA15
@@ -951,7 +951,7 @@ void Display_Init()
 // ============================================================================
 
 // FORMAT: D,DP,C,G,B,F,A,E
-const byte g_condisplayableCharacters[50] = {
+const byte g_condisplayableCharacters[70] = {
 		0b10101111, 0b00101000, 0b10011011, 0b10111010, 0b00111100,
 		0b10110110, 0b10110111, 0b00101010, 0b10111111, 0b10111110,
 		0b10000111, 0b11000111, 0b10111001, 0b11111001, 0b10010111,
@@ -961,7 +961,9 @@ const byte g_condisplayableCharacters[50] = {
 		0b10000001, 0b10000101, 0b10000111, 0b10001111, 0b10101111,
 		0b11101111, 0b11111110, 0b11111101, 0b11111011, 0b11110111,
 		0b11101111, 0b11011111, 0b10111111, 0b01111111, 0b11111111,
-		0b11011011, 0b01101000, 0b00010000, 0b00010101, 0b00111000
+		0b11011011, 0b01101000, 0b00010000, 0b00010101, 0b00111000,
+		0b11101111, 0b01101000, 0b11011011, 0b11111010, 0b01111100,
+		0b11110110, 0b11110111, 0b01101010, 0b11111111, 0b11111110,
 	};
 
 static uint8_t digitBitRemap(uint8_t nData)
@@ -1853,10 +1855,10 @@ public:
 		readPotentiometers();
 		setScale();
 		initializeArticulation();
-		if (m_bArticulationMode) {	// Display the software version (2.1.2)
-			m_ledLeftDigit = 45;
-			m_ledMiddleDigit = 46;
-			m_ledRightDigit = 2;
+		if (m_bArticulationMode) {	// Display the software version (3.0.0)
+			m_ledLeftDigit = 3 + 50;
+			m_ledMiddleDigit = 0 + 50;
+			m_ledRightDigit = 0;
 			setDisplay();
 			delay(1500);
 		} else {
