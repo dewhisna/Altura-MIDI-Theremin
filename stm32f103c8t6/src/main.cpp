@@ -393,6 +393,8 @@ protected:
 
 	void pumpTxEvents()
 	{
+		if (!USBComposite.isReady()) return;			// Must have USB connected, configured, and enabled
+		while (usb_midi_is_transmitting()) { }			// Can't pump messages while USB still transmitting
 		while (!m_xferTxBuffer.isEmpty()) {
 			const byte nData = m_xferTxBuffer.read();
 			if (m_CurrentTxPacketByteIndex == 0) {
