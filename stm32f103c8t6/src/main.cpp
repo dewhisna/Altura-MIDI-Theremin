@@ -1440,8 +1440,10 @@ protected:
 	{
 		#if (SWAP_SENSORS)
 		g_bRightSensorRead = false;
+		g_timeoutRightSensor.restart();
 		#else
 		g_bLeftSensorRead = false;
+		g_timeoutLeftSensor.restart();
 		#endif
 
 		uint8_t nTrigger = LeftTrigger_pin;		// Note: Since this pin is phyiscally tied to this timer, still pulse the one labeled "Left"
@@ -1450,20 +1452,16 @@ protected:
 		digitalWrite(nTrigger, HIGH);
 		delayMicroseconds(12);
 		digitalWrite(nTrigger, LOW);
-	
-		#if (SWAP_SENSORS)
-		g_timeoutRightSensor.restart();
-		#else
-		g_timeoutLeftSensor.restart();
-		#endif
 	}
 
 	void pingRightSensor()
 	{
 		#if (SWAP_SENSORS)
 		g_bLeftSensorRead = false;
+		g_timeoutLeftSensor.restart();
 		#else
 		g_bRightSensorRead = false;
+		g_timeoutRightSensor.restart();
 		#endif
 
 		uint8_t nTrigger = RightTrigger_pin;	// Note: Since this pin is phyiscally tied to this timer, still pulse the one labeled "Right"
@@ -1472,12 +1470,6 @@ protected:
 		digitalWrite(nTrigger, HIGH);
 		delayMicroseconds(12);
 		digitalWrite(nTrigger, LOW);
-
-		#if (SWAP_SENSORS)
-		g_timeoutLeftSensor.restart();
-		#else
-		g_timeoutRightSensor.restart();
-		#endif
 	}
 
 	long stabilizeLeftReadings(long nReading)
@@ -1830,15 +1822,15 @@ public:
 		for (byte i = m_nFastActionRatio; i > 0; --i) {
 			checkArticulation();
 			setDisplay();
-			delay(6);		// This ,combined with the above "for loop", is the main driving point for timing
+			delay(12);		// This ,combined with the above "for loop", is the main driving point for timing
 			pingLeftSensor();
-			delay(6);
-			pingRightSensor();
 			delay(6);
 			m_nLeftSensorProcessed = stabilizeLeftReadings(readLeftSensor());
 			handleLeftSensor();
 
 			if (m_bxyMode) {
+				pingRightSensor();
+				delay(6);
 				m_nRightSensorProcessed = stabilizeRightReadings(readRightSensor());
 				xyHandleRightSensor();
 				xyCheckPots();
