@@ -610,7 +610,7 @@ uint16_t readADC(uint8_t nPin)
 
 // Timer Interrupts
 
-static constexpr int g_conSensorTimeOut = 5000;
+static constexpr int g_conSensorTimeOut = 3750;		// This should be close to, but slightly larger than g_conMaximumDistance
 
 volatile bool g_bLeftSensorRead = false;			// Set when the left sensor reading is acquired
 volatile uint32_t g_nLeftSensorEchoTime = 0;		// Echo time for the Left Ultrasonic sensor in microseconds
