@@ -1085,10 +1085,10 @@ protected:
 
 	void setScale()
 	{
-		if(m_bDescending){
+		if (m_bDescending){
 			m_arrMIDINotes[m_nNotesInCurrentScale+1] = m_nKeyCurrent + (m_nOctaveFarCurrent * 12);
 			for (int note = m_nNotesInCurrentScale+1; note > 0; note--) {
-				m_arrMIDINotes[note - 1] = m_arrMIDINotes[note] + g_scales[m_nScaleCurrent][(m_nNotesInCurrentScale - note) % g_scales[m_nScaleCurrent][12]];
+				m_arrMIDINotes[note - 1] = m_arrMIDINotes[note] + g_scales[m_nScaleCurrent][((m_nNotesInCurrentScale+1) - note) % g_scales[m_nScaleCurrent][12]];
 			}
 		} else {
 			m_arrMIDINotes[0] = m_nKeyCurrent + (m_nOctaveNearCurrent * 12);
@@ -1187,8 +1187,6 @@ protected:
 	{
 		static int nOctaveNearOld = -1;
 		static int nOctaveFarOld = -1;
-		static int nSlopeCurrent = 1;
-		static int nSlopeOld = 1;
 		if ((m_arrPot[POT_octaveNearPot] != nOctaveNearOld) ||
 			(m_arrPot[POT_octaveFarPot] != nOctaveFarOld)) {
 			if (m_arrPot[POT_octaveNearPot] != nOctaveNearOld) {
@@ -1198,15 +1196,16 @@ protected:
 				m_nOctaveFarCurrent = mapADCvalue(m_arrPot[POT_octaveFarPot], m_conOctaveMax)+1;
 			}
 
-			nSlopeCurrent = (m_nOctaveFarCurrent + m_conOctaveMax) - m_nOctaveNearCurrent;
-			if (nSlopeCurrent == m_conOctaveMax) {
-				nSlopeCurrent = nSlopeOld;
+			int nSlopeCurrent = 0;
+			if (m_nOctaveFarCurrent > m_nOctaveNearCurrent) {
+				nSlopeCurrent = 1;
+			} else if (m_nOctaveFarCurrent < m_nOctaveNearCurrent) {
+				nSlopeCurrent = -1;
+			} else {
+				nSlopeCurrent = 0;
 			}
-			if (nSlopeCurrent < m_conOctaveMax) {
-				m_bDescending = true;
-			}
-			if (nSlopeCurrent > m_conOctaveMax) {
-				m_bDescending = false;
+			if (nSlopeCurrent != 0) {		// Change Descending flag only if the slope actually changed directions
+				m_bDescending = (nSlopeCurrent < 0);
 			}
 
 			m_nNumberOfOctavesCurrent = max(m_nOctaveFarCurrent, m_nOctaveNearCurrent) -
@@ -1224,7 +1223,6 @@ protected:
 			}
 			nOctaveNearOld = m_arrPot[POT_octaveNearPot];
 			nOctaveFarOld = m_arrPot[POT_octaveFarPot];
-			nSlopeOld = nSlopeCurrent;
 		}
 	}
 
