@@ -295,6 +295,9 @@ MIDI_CREATE_INSTANCE(HardwareSerial, g_USARTMIDI, MIDI)
 class MyUSBMIDI
 {
 private:
+	static constexpr uint32 m_conUSBBufferSize = 64;
+	static constexpr unsigned int m_conUSBConnectTimeout = 300;		// Timeout for detecting connected to USB on transmit in milliseconds
+
 	uint32 m_txPacketSize = 64;
 	uint32 m_rxPacketSize = 64;
 
@@ -304,7 +307,7 @@ private:
 		return true;
 	}
 
-    typedef midi::RingBuffer<byte, 64> RingBuffer;
+    typedef midi::RingBuffer<byte, m_conUSBBufferSize> RingBuffer;
     RingBuffer m_xferTxBuffer;
     RingBuffer m_xferRxBuffer;
     int m_CurrentTxPacketByteIndex = 0;
@@ -314,8 +317,14 @@ private:
 		uint8_t b[4];
 		MIDI_EVENT_PACKET_t p;
 	} m_CurrentTxPacket;
+	bool m_bUSBConnectionActive = true;			// Assume we are connceted until we timeout
+	CTimeoutMS m_timeoutUSB;
 
 public: // Serial / Stream API required for template compatibility
+	MyUSBMIDI()
+		:	m_timeoutUSB(m_conUSBConnectTimeout)
+	{ }
+
 	inline void begin(unsigned inBaudrate)
 	{
 		if (usbMIDIPart.usbReset) usbMIDIPart.usbReset();
@@ -323,6 +332,8 @@ public: // Serial / Stream API required for template compatibility
 		m_xferTxBuffer.clear();
 		resetTx();
 		m_bCurrentTxInSysex = false;
+		m_timeoutUSB.restart();
+		m_bUSBConnectionActive = true;
 	}
 
 	inline unsigned available()
@@ -394,7 +405,13 @@ protected:
 	void pumpTxEvents()
 	{
 		if (!USBComposite.isReady()) return;			// Must have USB connected, configured, and enabled
-		while (usb_midi_is_transmitting()) { }			// Can't pump messages while USB still transmitting
+		if (m_bUSBConnectionActive) m_timeoutUSB.restart();		// If we were active, start our countdown
+		while (usb_midi_is_transmitting() && !m_timeoutUSB.hasExpired()) { }			// Can't pump messages while USB still transmitting
+		if (usb_midi_is_transmitting() && m_timeoutUSB.hasExpired()) {
+			m_bUSBConnectionActive = false;				// If we just timed out on previous transmit, go inactive
+			return;
+		}
+		m_bUSBConnectionActive = true;					// If the previous transmit went through, go active
 		while (!m_xferTxBuffer.isEmpty()) {
 			const byte nData = m_xferTxBuffer.read();
 			if (m_CurrentTxPacketByteIndex == 0) {
