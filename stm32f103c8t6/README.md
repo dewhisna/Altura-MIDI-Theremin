@@ -18,6 +18,8 @@ The PCBs are posted on and available through OSHPark:
 
 Prebuilt binary files are available on the [Releases Page](https://github.com/dewhisna/Altura-MIDI-Theremin/releases).  Two STM32 binaries are posted with the second one having the left/right sensors swapped.
 
+Note: For extended battery life, replace the 10K potentiometers in the bill-of-materials (RV1-RV8) with 100K versions (like on the original ATmega328 version).  The 100K pots work just as well, but will use 1/10th the power than the 10K will in terms of constant voltage drop.  The 10K parts were chosen only because I happened to already have an entire bag-full of them on-hand.
+
 To program the binary file into the chip, use the `stm32flash` tool from the `stm32duino` project or from [http://github.com/rogerclarkmelbourne/arduino_stm32](http://github.com/rogerclarkmelbourne/arduino_stm32).
 
 Flashing can be accomplished through the on-board FTDI port using a standard off-the-shelf FTDI cable (either 3.3v or 5v version).  This port is the standard FTDI configuration as used on Arduino ProMini and similar boards.
