@@ -1,0 +1,10 @@
+Reference, Value, Footprint, Datasheet
+"LED1","5631BH","led_ex:LED5631BH",""
+"U1","TM1637","Housings_SOIC:SOIC-20W_7.5x12.8mm_Pitch1.27mm",""
+"R1","10K","resistors_ex:R_0805",""
+"R2","10K","resistors_ex:R_0805",""
+"C1","100pF","capacitors_ex:C_0805",""
+"C2","100pF","capacitors_ex:C_0805",""
+"C3","47uF/10V","Capacitors_SMD:CP_Elec_6.3x5.8",""
+"C4","0.1uF","capacitors_ex:C_0805",""
+"J1","Conn_01x04","Pin_Headers:Pin_Header_Angled_1x04_Pitch2.54mm",""
