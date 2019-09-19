@@ -54,16 +54,16 @@ extern volatile ToverflowCounter g_overflowCounter;
 // ----------------------------------------------------------------------------
 
 extern uint32_t SystemTime_CurrentTicks32();
-inline __always_inline uint16_t SystemTime_CurrentTicks16() { return SYSTEM_TIME_TIMER_BASE->CNT; }
+inline uint16_t SystemTime_CurrentTicks16() { return SYSTEM_TIME_TIMER_BASE->CNT; }
 
 // This function must be called by Timer Interrupt handlers!
-inline __always_inline void handleSystemTimeTick()
+inline void handleSystemTimeTick()
 {
 	++g_overflowCounter.split.m_nHigh;
 	g_overflowCounter.split.m_nLow = 0;
 }
 
-inline __always_inline uint32_t CPU_MillisecondsToTicks( uint32_t nMillis )
+inline uint32_t CPU_MillisecondsToTicks( uint32_t nMillis )
 {
 	uint64_t nTicks = nMillis;
 	nTicks *= (TIMER_CLOCK_HZ/TIMER_PRESCALER);
@@ -71,7 +71,7 @@ inline __always_inline uint32_t CPU_MillisecondsToTicks( uint32_t nMillis )
 	return static_cast<uint32_t>(nTicks);
 }
 
-inline __always_inline uint32_t CPU_MicrosecondsToTicks( uint32_t uSec )
+inline uint32_t CPU_MicrosecondsToTicks( uint32_t uSec )
 {
 	uint64_t nTicks = uSec;
 	nTicks *= (TIMER_CLOCK_HZ/TIMER_PRESCALER);
